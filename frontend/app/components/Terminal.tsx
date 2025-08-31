@@ -248,12 +248,17 @@ export default function Terminal() {
     setIsLoading(true)
 
     try {
-      // Prepare the request body according to the Pydantic model structure
+      // Prepare the request body according to the Pydantic ChatRequest model structure
+      // This must exactly match the backend's ChatRequest(BaseModel) fields:
+      // - developer_message: str (system prompt)
+      // - user_message: str (user input)
+      // - model: Optional[str] = "gpt-4.1-mini" (OpenAI model)
+      // - api_key: str (OpenAI API key)
       const requestBody = {
         developer_message: "Eres un asistente de IA útil y amigable. Responde de manera clara y concisa.",
         user_message: content.trim(),
         model: "gpt-4.1-mini",
-        api_key: apiKey // Use the stored API key from state
+        api_key: apiKey
       }
 
       const response = await fetch('http://localhost:8000/api/chat', {
