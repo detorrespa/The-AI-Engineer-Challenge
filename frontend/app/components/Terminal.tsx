@@ -95,10 +95,109 @@ const LoadingIndicator = styled.div`
   }
 `
 
+const ConfigScreen = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+`
+
+const ConfigContainer = styled.div`
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid #00ff00;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+`
+
+const ConfigTitle = styled.h1`
+  color: #00ff00;
+  font-size: 28px;
+  margin-bottom: 20px;
+  text-shadow: 0 0 10px #00ff00;
+`
+
+const ConfigDescription = styled.p`
+  color: #00cc00;
+  font-size: 16px;
+  margin-bottom: 30px;
+  line-height: 1.6;
+`
+
+const ApiKeyInput = styled.input`
+  width: 100%;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #00ff00;
+  border-radius: 8px;
+  color: #00ff00;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  margin-bottom: 20px;
+  outline: none;
+  
+  &:focus {
+    border-color: #00cc00;
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+  }
+  
+  &::placeholder {
+    color: #00aa00;
+    opacity: 0.7;
+  }
+`
+
+const BeginButton = styled.button`
+  background: rgba(0, 255, 0, 0.1);
+  border: 2px solid #00ff00;
+  color: #00ff00;
+  padding: 15px 30px;
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: rgba(0, 255, 0, 0.2);
+    box-shadow: 0 0 15px rgba(0, 255, 0, 0.4);
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`
+
+const ApiKeyInfo = styled.div`
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(0, 255, 0, 0.05);
+  border: 1px solid #00aa00;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #00aa00;
+  line-height: 1.4;
+`
+
 export default function Terminal() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('disconnected')
+  const [apiKey, setApiKey] = useState<string>('')
+  const [isConfigured, setIsConfigured] = useState<boolean>(false)
+  const [apiKeyInput, setApiKeyInput] = useState<string>('')
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when new messages arrive
@@ -110,8 +209,10 @@ export default function Terminal() {
 
   // Check backend connection on mount
   useEffect(() => {
-    checkConnection()
-  }, [])
+    if (isConfigured) {
+      checkConnection()
+    }
+  }, [isConfigured])
 
   const checkConnection = async () => {
     setConnectionStatus('connecting')
@@ -152,7 +253,7 @@ export default function Terminal() {
         developer_message: "Eres un asistente de IA útil y amigable. Responde de manera clara y concisa.",
         user_message: content.trim(),
         model: "gpt-4.1-mini",
-        api_key: process.env.NEXT_PUBLIC_OPENAI_API_KEY || "sk-proj-..." // Fallback for demo - replace with your actual key
+        api_key: apiKey // Use the stored API key from state
       }
 
       const response = await fetch('http://localhost:8000/api/chat', {
@@ -241,39 +342,88 @@ export default function Terminal() {
     }
   }
 
+  const handleApiKeySubmit = () => {
+    if (apiKeyInput.trim()) {
+      setApiKey(apiKeyInput.trim())
+      setIsConfigured(true)
+    }
+  }
+
+  const handleApiKeyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleApiKeySubmit()
+    }
+  }
+
   return (
     <TerminalContainer>
       <MatrixBackground />
       
-      <TerminalHeader>
-        <TerminalTitle>MATRIX TERMINAL v1.0</TerminalTitle>
-        <TerminalStatus style={{ color: getStatusColor() }}>
-          {getStatusText()}
-        </TerminalStatus>
-      </TerminalHeader>
+      {!isConfigured ? (
+        <ConfigScreen>
+          <ConfigContainer>
+            <ConfigTitle>MATRIX TERMINAL v1.0</ConfigTitle>
+            <ConfigDescription>
+              Bienvenido al Matrix Terminal. Para comenzar, necesitamos tu clave de API de OpenAI.
+              <br />
+              Tu clave se almacena localmente y nunca se comparte.
+            </ConfigDescription>
+            
+            <ApiKeyInput
+              type="password"
+              placeholder="Ingresa tu OpenAI API Key (sk-proj-...)"
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              onKeyDown={handleApiKeyKeyDown}
+              autoFocus
+            />
+            
+            <BeginButton 
+              onClick={handleApiKeySubmit}
+              disabled={!apiKeyInput.trim()}
+            >
+              COMENZAR
+            </BeginButton>
+            
+            <ApiKeyInfo>
+              <strong>¿No tienes una API key?</strong><br />
+              Obtén tu clave gratuita en <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style={{color: '#00ffff'}}>platform.openai.com</a>
+            </ApiKeyInfo>
+          </ConfigContainer>
+        </ConfigScreen>
+      ) : (
+        <>
+          <TerminalHeader>
+            <TerminalTitle>MATRIX TERMINAL v1.0</TerminalTitle>
+            <TerminalStatus style={{ color: getStatusColor() }}>
+              {getStatusText()}
+            </TerminalStatus>
+          </TerminalHeader>
 
-      <ChatContainer ref={chatContainerRef}>
-        {messages.length === 0 && (
-          <WelcomeMessage>
-            <h2>Bienvenido al Matrix Terminal</h2>
-            <p>Conectado al sistema de IA...</p>
-            <p>Escribe tu mensaje y presiona ENTER para comenzar.</p>
-            <p>Presiona CTRL+C para salir.</p>
-          </WelcomeMessage>
-        )}
+          <ChatContainer ref={chatContainerRef}>
+            {messages.length === 0 && (
+              <WelcomeMessage>
+                <h2>Bienvenido al Matrix Terminal</h2>
+                <p>Conectado al sistema de IA...</p>
+                <p>Escribe tu mensaje y presiona ENTER para comenzar.</p>
+                <p>Presiona CTRL+C para salir.</p>
+              </WelcomeMessage>
+            )}
 
-        {messages.map((message) => (
-          <ChatMessage key={message.id} message={message} />
-        ))}
+            {messages.map((message) => (
+              <ChatMessage key={message.id} message={message} />
+            ))}
 
-        {isLoading && (
-          <LoadingIndicator>
-            Procesando respuesta...
-          </LoadingIndicator>
-        )}
-      </ChatContainer>
+            {isLoading && (
+              <LoadingIndicator>
+                Procesando respuesta...
+              </LoadingIndicator>
+            )}
+          </ChatContainer>
 
-      <InputArea onSendMessage={sendMessage} disabled={isLoading} />
+          <InputArea onSendMessage={sendMessage} disabled={isLoading} />
+        </>
+      )}
     </TerminalContainer>
   )
 }
