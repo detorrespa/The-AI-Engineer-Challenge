@@ -34,3 +34,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Allow Next.js app lib folder
+!frontend/app/lib/
+!frontend/app/lib/registry.tsx
