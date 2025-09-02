@@ -21,10 +21,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <StyledComponentsRegistry>
           <GlobalStyles />
-          <header className="flex items-center justify-between p-4">
-            <h1>MATRIX TERMINAL v1.0</h1>
-            <DemoToggle />
-          </header>
+          <DemoToggle />
           {children}
         </StyledComponentsRegistry>
       </body>
