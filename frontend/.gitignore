@@ -37,3 +37,6 @@ next-env.d.ts
 # Allow Next.js app lib folder
 !frontend/app/lib/
 !frontend/app/lib/registry.tsx
+# allow frontend lib (demo)
+!frontend/lib/
+!frontend/lib/demoMode.ts
