@@ -5,6 +5,9 @@ import styled from 'styled-components'
 import ChatMessage from './ChatMessage'
 import InputArea from './InputArea'
 import MatrixBackground from './MatrixBackground'
+import DemoToggle from './DemoToggle'
+import DemoBanner from './DemoBanner'
+import { isDemoMode } from '@/lib/demoMode'
 
 interface Message {
   id: string
@@ -199,6 +202,7 @@ export default function Terminal() {
   const [isConfigured, setIsConfigured] = useState<boolean>(false)
   const [apiKeyInput, setApiKeyInput] = useState<string>('')
   const chatContainerRef = useRef<HTMLDivElement>(null)
+  const [demoMode, setDemoMode] = useState<boolean>(false)
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -213,6 +217,20 @@ export default function Terminal() {
       checkConnection()
     }
   }, [isConfigured])
+
+  // Check demo mode on mount and when URL changes
+  useEffect(() => {
+    const checkDemoMode = () => {
+      setDemoMode(isDemoMode())
+    }
+    
+    checkDemoMode()
+    window.addEventListener('popstate', checkDemoMode)
+    
+    return () => {
+      window.removeEventListener('popstate', checkDemoMode)
+    }
+  }, [])
 
   const checkConnection = async () => {
     setConnectionStatus('connecting')
@@ -248,63 +266,98 @@ export default function Terminal() {
     setIsLoading(true)
 
     try {
-      // Prepare the request body according to the Pydantic ChatRequest model structure
-      // This must exactly match the backend's ChatRequest(BaseModel) fields:
-      // - developer_message: str (system prompt)
-      // - user_message: str (user input)
-      // - model: Optional[str] = "gpt-4.1-mini" (OpenAI model)
-      // - api_key: str (OpenAI API key)
-      const requestBody = {
-        developer_message: "Eres un asistente de IA útil y amigable. Responde de manera clara y concisa.",
-        user_message: content.trim(),
-        model: "gpt-4.1-mini",
-        api_key: apiKey
-      }
+      let response: Response
+      let assistantMessage: Message
 
-      const response = await fetch('http://localhost:8000/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      })
+      if (demoMode) {
+        // Modo Demo: usar API route local
+        const messages = [
+          { role: 'system', content: "Eres un asistente de IA útil y amigable. Responde de manera clara y concisa." },
+          { role: 'user', content: content.trim() }
+        ]
 
-      if (!response.ok) {
-        throw new Error(`Network response was not ok: ${response.status}`)
-      }
+        response = await fetch('/api/demo', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messages,
+            model: 'gpt-4o-mini'
+          }),
+        })
 
-      const reader = response.body?.getReader()
-      if (!reader) {
-        throw new Error('No response body')
-      }
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || `Demo API error: ${response.status}`)
+        }
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: '',
-        timestamp: new Date(),
-      }
+        const data = await response.json()
+        const content = data.choices?.[0]?.message?.content || 'No se recibió respuesta'
 
-      setMessages(prev => [...prev, assistantMessage])
+        assistantMessage = {
+          id: (Date.now() + 1).toString(),
+          type: 'assistant',
+          content,
+          timestamp: new Date(),
+        }
 
-      const decoder = new TextDecoder()
-      let accumulatedContent = ''
+        setMessages(prev => [...prev, assistantMessage])
 
-      while (true) {
-        const { done, value } = await reader.read()
-        
-        if (done) break
+      } else {
+        // Modo Normal: usar backend FastAPI
+        const requestBody = {
+          developer_message: "Eres un asistente de IA útil y amigable. Responde de manera clara y concisa.",
+          user_message: content.trim(),
+          model: "gpt-4.1-mini",
+          api_key: apiKey
+        }
 
-        const chunk = decoder.decode(value, { stream: true })
-        accumulatedContent += chunk
+        response = await fetch('http://localhost:8000/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        })
 
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === assistantMessage.id 
-              ? { ...msg, content: accumulatedContent }
-              : msg
+        if (!response.ok) {
+          throw new Error(`Network response was not ok: ${response.status}`)
+        }
+
+        const reader = response.body?.getReader()
+        if (!reader) {
+          throw new Error('No response body')
+        }
+
+        assistantMessage = {
+          id: (Date.now() + 1).toString(),
+          type: 'assistant',
+          content: '',
+          timestamp: new Date(),
+        }
+
+        setMessages(prev => [...prev, assistantMessage])
+
+        const decoder = new TextDecoder()
+        let accumulatedContent = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          
+          if (done) break
+
+          const chunk = decoder.decode(value, { stream: true })
+          accumulatedContent += chunk
+
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === assistantMessage.id 
+                ? { ...msg, content: accumulatedContent }
+                : msg
+            )
           )
-        )
+        }
       }
 
     } catch (error) {
@@ -354,6 +407,13 @@ export default function Terminal() {
     }
   }
 
+  // En modo demo, no se requiere API key
+  useEffect(() => {
+    if (demoMode) {
+      setIsConfigured(true)
+    }
+  }, [demoMode])
+
   const handleApiKeyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleApiKeySubmit()
@@ -393,6 +453,9 @@ export default function Terminal() {
             <ApiKeyInfo>
               <strong>¿No tienes una API key?</strong><br />
               Obtén tu clave gratuita en <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style={{color: '#00ffff'}}>platform.openai.com</a>
+              <br /><br />
+              <strong>¿Quieres probar sin API key?</strong><br />
+              Haz clic en "Use Demo" en la esquina superior derecha.
             </ApiKeyInfo>
           </ConfigContainer>
         </ConfigScreen>
@@ -400,12 +463,17 @@ export default function Terminal() {
         <>
           <TerminalHeader>
             <TerminalTitle>MATRIX TERMINAL v1.0</TerminalTitle>
-            <TerminalStatus style={{ color: getStatusColor() }}>
-              {getStatusText()}
-            </TerminalStatus>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <DemoToggle />
+              <TerminalStatus style={{ color: getStatusColor() }}>
+                {getStatusText()}
+              </TerminalStatus>
+            </div>
           </TerminalHeader>
 
           <ChatContainer ref={chatContainerRef}>
+            {demoMode && <DemoBanner />}
+            
             {messages.length === 0 && (
               <WelcomeMessage>
                 <h2>Bienvenido al Matrix Terminal</h2>
