@@ -293,12 +293,12 @@ export default function Terminal() {
         }
 
         const data = await response.json()
-        const content = data.choices?.[0]?.message?.content || 'No se recibió respuesta'
+        const responseContent = data.choices?.[0]?.message?.content || 'No se recibió respuesta'
 
         assistantMessage = {
           id: (Date.now() + 1).toString(),
           type: 'assistant',
-          content,
+          content: responseContent,
           timestamp: new Date(),
         }
 
