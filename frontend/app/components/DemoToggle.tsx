@@ -1,11 +1,11 @@
 'use client';
 
-import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useMemo } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 function useIsDemo() {
   const sp = useSearchParams();
-  return (sp.get('demo') === '1');
+  return sp.get('demo') === '1';
 }
 
 export default function DemoToggle() {
@@ -21,24 +21,17 @@ export default function DemoToggle() {
     return q ? `${pathname}?${q}` : pathname;
   }, [demo, pathname, sp]);
 
-  const onClick = () => router.replace(nextHref); // cambia el query param y re-renderiza
+  const onClick = () => router.replace(nextHref);
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={[
-        // posición arriba-derecha
-        'fixed top-3 right-3 z-50',
-        // estilo Matrix
-        'px-3 py-1 rounded border',
-        'border-green-500 text-green-300',
-        'bg-black/40 hover:bg-green-900/30',
-        'shadow-[0_0_10px_#00ff00] transition'
-      ].join(' ')}
+      className="fixed top-3 right-3 z-50 px-3 py-1 rounded border border-green-500 text-green-300 bg-black/40 hover:bg-green-900/30 shadow-[0_0_10px_#00ff00] transition"
       aria-label={demo ? 'Exit Demo' : 'Use Demo'}
     >
       {demo ? 'Exit Demo' : 'Use Demo'}
     </button>
   );
 }
+
